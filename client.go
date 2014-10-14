@@ -4,6 +4,9 @@ import "log"
 import "sync"
 import "time"
 import "fmt"
+import "bytes"
+import "encoding/binary"
+import "encoding/json"
 
 const CLIENT_TIMEOUT = (60*10)
 type Client struct {
@@ -28,6 +31,7 @@ func (client *Client) Read() {
         client.conn.SetDeadline(time.Now().Add(CLIENT_TIMEOUT*time.Second))
         msg := ReceiveMessage(client.conn)
         if msg == nil {
+            log.Println("eeeeeeee")
             route.RemoveClient(client)
             if client.uid > 0 {
                 cluster.RemoveClient(client.uid)
@@ -51,6 +55,10 @@ func (client *Client) Read() {
             client.HandleInputing(msg.body.(*MessageInputing))
         } else if msg.cmd == MSG_SUBSCRIBE_ONLINE_STATE {
             client.HandleSubsribe(msg.body.(*MessageSubsribeState))
+        } else if msg.cmd == MSG_VOIP_CONTROL {
+            client.HandleVOIPControl(msg.body.(*VOIPControl))
+        } else if msg.cmd == MSG_VOIP_DATA {
+            client.HandleVOIPData(msg.body.(*VOIPData))
         } else {
             log.Println("unknown msg:", msg.cmd)
         }
@@ -189,6 +197,65 @@ func (client *Client) HandleIMMessage(msg *IMMessage, seq int) {
         storage.SaveOfflineMessage(msg.receiver, &Message{cmd:MSG_IM, body:msg})
     }
     client.wt <- &Message{cmd:MSG_ACK, body:MessageACK(seq)}
+}
+
+const VOIP_COMMAND_DIAL = 1
+
+func (client *Client) GetDialCount(ctl *VOIPControl) int {
+    if len(ctl.content) < 4 {
+        return 0
+    }
+    
+    var ctl_cmd int32
+    buffer := bytes.NewBuffer(ctl.content)
+    binary.Read(buffer, binary.BigEndian, &ctl_cmd)
+    if ctl_cmd != VOIP_COMMAND_DIAL {
+        return 0
+    }
+
+    if len(ctl.content) != 8 {
+        return 0
+    }
+    var dial_count int32
+    binary.Read(buffer, binary.BigEndian, &dial_count)
+
+    return int(dial_count)
+}
+
+func (client *Client) PublishMessage(ctl *VOIPControl) {
+    //首次拨号时发送apns通知
+    count := client.GetDialCount(ctl)
+    if count != 1 {
+        return
+    }
+
+    log.Println("publish invite notification")
+    conn := redis_pool.Get()
+    defer conn.Close()
+
+    v := make(map[string]interface{})
+    v["content"] = "您的朋友请求与您通话"
+    v["sender"] = ctl.sender
+    v["receiver"] = ctl.receiver
+    b, _ := json.Marshal(v)
+    _, err := conn.Do("RPUSH", "face_push_queue", b)
+    if err != nil {
+        storage.redis = nil;
+        log.Println("error:", err)
+    }
+}
+
+func (client *Client) HandleVOIPControl(msg *VOIPControl) {
+    m := &Message{cmd:MSG_VOIP_CONTROL, body:msg}
+    r := client.SendMessage(msg.receiver, m)
+    if !r {
+        client.PublishMessage(msg)
+    }
+}
+
+func (client *Client) HandleVOIPData(msg *VOIPData) {
+    m := &Message{cmd:MSG_VOIP_DATA, body:msg}
+    client.SendMessage(msg.receiver, m)
 }
 
 func (client *Client) HandleGroupIMMessage(msg *IMMessage, seq int) {

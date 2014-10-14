@@ -17,6 +17,10 @@ const MSG_INPUTING = 10
 const MSG_SUBSCRIBE_ONLINE_STATE = 11
 const MSG_ONLINE_STATE = 12
 
+const MSG_VOIP_CONTROL = 64
+const MSG_VOIP_DATA = 65
+
+//peer<->peer
 const MSG_ADD_CLIENT = 128
 const MSG_REMOVE_CLIENT = 129
 
@@ -25,6 +29,18 @@ type IMMessage struct {
     receiver int64
     msgid int32
     content string
+}
+
+type VOIPControl struct {
+    sender int64
+    receiver int64
+    content []byte
+}
+
+type VOIPData struct {
+    sender int64
+    receiver int64
+    content []byte
 }
 
 type MessageInputing struct {
@@ -163,7 +179,28 @@ func ReceiveMessage(conn io.Reader) *Message {
             binary.Read(buffer, binary.BigEndian, &sub.uids[i])
         }
         return &Message{int(cmd), int(seq), sub}
+    } else if cmd == MSG_VOIP_CONTROL {
+        if len <= 16 {
+            return nil
+        }
+        ctl := &VOIPControl{}
+        buffer := bytes.NewBuffer(buff)
+        binary.Read(buffer, binary.BigEndian, &ctl.sender)
+        binary.Read(buffer, binary.BigEndian, &ctl.receiver)
+        ctl.content = buff[16:]
+        return &Message{int(cmd), int(seq), ctl}
+    } else if cmd == MSG_VOIP_DATA {
+        if len <= 16 {
+            return nil
+        }
+        data := &VOIPData{}
+        buffer := bytes.NewBuffer(buff)
+        binary.Read(buffer, binary.BigEndian, &data.sender)
+        binary.Read(buffer, binary.BigEndian, &data.receiver)
+        data.content = buff[16:]
+        return &Message{int(cmd), int(seq), data}
     } else {
+        log.Println("invalid cmd:", cmd)
         return nil
     }
 }
@@ -329,6 +366,36 @@ func WriteState(conn io.Writer, seq int, state *MessageOnlineState) {
     }
 }
 
+func WriteVOIPControl(conn io.Writer, seq int, ctl *VOIPControl) {
+    var length int32 = int32(len(ctl.content) + 16)
+    buffer := new(bytes.Buffer)
+    WriteHeader(length, int32(seq), MSG_VOIP_CONTROL, buffer)
+    binary.Write(buffer, binary.BigEndian, ctl.sender)
+    binary.Write(buffer, binary.BigEndian, ctl.receiver)
+    buffer.Write([]byte(ctl.content))
+    buf := buffer.Bytes()
+
+    n, err := conn.Write(buf)
+    if err != nil || n != len(buf) {
+        log.Println("sock write error")
+    }
+}
+
+func WriteVOIPData(conn io.Writer, seq int, data *VOIPData) {
+    var length int32 = int32(len(data.content) + 16)
+    buffer := new(bytes.Buffer)
+    WriteHeader(length, int32(seq), MSG_VOIP_DATA, buffer)
+    binary.Write(buffer, binary.BigEndian, data.sender)
+    binary.Write(buffer, binary.BigEndian, data.receiver)
+    buffer.Write(data.content)
+    buf := buffer.Bytes()
+
+    n, err := conn.Write(buf)
+    if err != nil || n != len(buf) {
+        log.Println("sock write error")
+    }    
+}
+
 func SendMessage(conn io.Writer, msg *Message) {
     if msg.cmd == MSG_AUTH {
         WriteAuth(conn, msg.seq, msg.body.(*Authentication))
@@ -354,6 +421,10 @@ func SendMessage(conn io.Writer, msg *Message) {
         WriteGroupNotification(conn, msg.seq, msg.body.(string))
     } else if msg.cmd == MSG_ONLINE_STATE {
         WriteState(conn, msg.seq, msg.body.(*MessageOnlineState))
+    } else if msg.cmd == MSG_VOIP_CONTROL {
+        WriteVOIPControl(conn, msg.seq, msg.body.(*VOIPControl))
+    } else if msg.cmd == MSG_VOIP_DATA {
+        WriteVOIPData(conn, msg.seq, msg.body.(*VOIPData))
     } else {
         log.Println("unknow cmd", msg.cmd)
     }
