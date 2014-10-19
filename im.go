@@ -15,6 +15,7 @@ var group_manager *GroupManager
 var group_server *GroupServer
 var state_center *StateCenter
 var redis_pool *redis.Pool
+var tunnel *Tunnel
 var config *Config
 
 func init() {
@@ -89,8 +90,8 @@ func main() {
     }
 
     config = read_cfg(flag.Args()[0])
-    log.Infof("port:%d storage root:%s redis address:%s\n", 
-        config.port, config.storage_root, config.redis_address)
+    log.Infof("port:%d tunnel port:%d storage root:%s redis address:%s\n", 
+        config.port, config.tunnel_port, config.storage_root, config.redis_address)
 
     cluster = NewCluster(config.peer_addrs)
     cluster.Start()
@@ -100,6 +101,9 @@ func main() {
     group_server.Start()
     group_manager = NewGroupManager()
     group_manager.Start()
+
+    tunnel = NewTunnel()
+    tunnel.Start()
 
     redis_pool = NewRedisPool(config.redis_address, "")
 

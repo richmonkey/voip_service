@@ -8,6 +8,7 @@ import "net"
 
 type Config struct {
     port int
+    tunnel_port int
     storage_root string
     mysqldb_datasource string
     redis_address string
@@ -51,6 +52,7 @@ func read_cfg(cfg_path string) *Config{
 	}
 
     config.port = get_int(app_cfg, "port")
+    config.tunnel_port = get_int(app_cfg, "tunnel_port")
     config.storage_root = get_string(app_cfg, "storage_root")
     config.redis_address = get_string(app_cfg, "redis_address")
     config.mysqldb_datasource = get_string(app_cfg, "mysqldb_source")
