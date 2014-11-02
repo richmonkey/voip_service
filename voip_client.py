@@ -32,6 +32,8 @@ VOIP_COMMAND_HANG_UP = 5
 VOIP_COMMAND_RESET = 6
 VOIP_COMMAND_TALKING = 7
 
+HOST = "127.0.0.1"
+HOST = "106.186.122.158"
 class Authentication:
     def __init__(self):
         self.uid = 0
@@ -103,7 +105,7 @@ def recv_message(sock):
 
 def connect_server(uid, port):
     seq = 0
-    address = ("127.0.0.1", port)
+    address = (HOST, port)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  
     sock.connect(address)
     auth = Authentication()
@@ -134,20 +136,11 @@ def send_refuse(sock, seq, sender, receiver):
 def send_connected(sock, seq, sender, receiver):
     send_control(sock, seq, sender, receiver, VOIP_COMMAND_CONNECTED)
     
-def dial():
-    caller = 86013800000001
-    called = 86013800000000
-
-    sock, seq = connect_server(caller, 23000)
-    seq = seq + 1
-    send_dial(sock, seq, caller, called)
-
-    
 def simultaneous_dial():
-    caller = 86013800000001
+    caller = 86013800000009
     called = 86013800000000
 
-    sock, seq = connect_server(caller, 23000)
+    sock, seq = connect_server(caller, 20000)
     seq = seq + 1
     send_dial(sock, seq, caller, called)
 
@@ -193,8 +186,8 @@ def simultaneous_dial():
         
 def listen():
     caller = 0
-    called = 86013800000001
-    sock, seq = connect_server(called, 23000)
+    called = 86013800000009
+    sock, seq = connect_server(called, 20000)
     while True:
         cmd, _, msg = recv_message(sock)
         if cmd != MSG_VOIP_CONTROL:
@@ -224,11 +217,11 @@ def listen():
         send_refuse(sock, seq, called, caller)
         return
 
-    address = ('0.0.0.0', 23001)
+    address = ('0.0.0.0', 20001)
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  
     b = struct.pack("!qq", called, caller)
     b += "\x00\x00"
-    s.sendto(b, ("127.0.0.1", 23001))
+    s.sendto(b, (HOST, 20001))
 
     while True:
         rs, _, _ = select.select([s, sock], [], [])
@@ -243,6 +236,9 @@ def listen():
                 if msg.cmd == VOIP_COMMAND_HANG_UP:
                     print "peer hang up"
                     break
+            elif cmd == 0:
+                print "voip control socket closed"
+                break
             else:
                 print "unknow command:", cmd
 
