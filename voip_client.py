@@ -28,9 +28,10 @@ VOIP_COMMAND_DIAL = 1
 VOIP_COMMAND_ACCEPT = 2
 VOIP_COMMAND_CONNECTED = 3
 VOIP_COMMAND_REFUSE = 4
-VOIP_COMMAND_HANG_UP = 5
-VOIP_COMMAND_RESET = 6
-VOIP_COMMAND_TALKING = 7
+VOIP_COMMAND_REFUSED = 5
+VOIP_COMMAND_HANG_UP = 6
+VOIP_COMMAND_RESET = 7
+VOIP_COMMAND_TALKING = 8
 
 HOST = "127.0.0.1"
 HOST = "106.186.122.158"
@@ -133,6 +134,9 @@ def send_accept(sock, seq, sender, receiver):
 def send_refuse(sock, seq, sender, receiver):
     send_control(sock, seq, sender, receiver, VOIP_COMMAND_REFUSE)
     
+def send_refused(sock, seq, sender, receiver):
+    send_control(sock, seq, sender, receiver, VOIP_COMMAND_REFUSED)
+
 def send_connected(sock, seq, sender, receiver):
     send_control(sock, seq, sender, receiver, VOIP_COMMAND_CONNECTED)
     
@@ -166,6 +170,8 @@ def simultaneous_dial():
             return
     elif msg.cmd == VOIP_COMMAND_REFUSE:
         print "dial refused"
+        seq = seq + 1
+        send_refused(sock, seq, caller, called)
         return
     else:
         print "unknow:", msg.content
@@ -275,5 +281,5 @@ def query_yes_no(question, default="yes"):
                              "(or 'y' or 'n').\n")
 
 if __name__ == "__main__":
-    #simultaneous_dial()
-    listen()
+    simultaneous_dial()
+    #listen()
