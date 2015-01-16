@@ -52,6 +52,8 @@ func (client *Client) Read() {
 			client.HandleACK(msg.body.(MessageACK))
 		} else if msg.cmd == MSG_HEARTBEAT {
 
+		} else if msg.cmd == MSG_PING {
+			client.HandlePing()
 		} else if msg.cmd == MSG_INPUTING {
 			client.HandleInputing(msg.body.(*MessageInputing))
 		} else if msg.cmd == MSG_SUBSCRIBE_ONLINE_STATE {
@@ -165,6 +167,11 @@ func (client *Client) HandleAuth(login *Authentication) {
 	client.SendOfflineMessage()
 
 	client.SetUpTimestamp()
+}
+
+func (client *Client) HandlePing() {
+	msg := &Message{cmd: MSG_PONG}
+	client.wt <- msg
 }
 
 func (client *Client) HandleSubsribe(msg *MessageSubsribeState) {

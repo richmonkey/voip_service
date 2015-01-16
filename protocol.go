@@ -17,6 +17,8 @@ const MSG_PEER_ACK = 9
 const MSG_INPUTING = 10
 const MSG_SUBSCRIBE_ONLINE_STATE = 11
 const MSG_ONLINE_STATE = 12
+const MSG_PING = 13
+const MSG_PONG = 14
 
 const MSG_VOIP_CONTROL = 64
 const MSG_VOIP_DATA = 65
@@ -147,7 +149,7 @@ func ReceiveMessage(conn io.Reader) *Message {
 		var ack int32
 		binary.Read(buffer, binary.BigEndian, &ack)
 		return &Message{int(cmd), int(seq), MessageACK(ack)}
-	} else if cmd == MSG_HEARTBEAT {
+	} else if cmd == MSG_HEARTBEAT || cmd == MSG_PING {
 		return &Message{int(cmd), int(seq), nil}
 	} else if cmd == MSG_INPUTING {
 		if len < 16 {
@@ -328,6 +330,17 @@ func WriteHeartbeat(conn io.Writer, seq int) {
 	}
 }
 
+func WritePong(conn io.Writer, seq int) {
+	var length int32 = 0
+	buffer := new(bytes.Buffer)
+	WriteHeader(length, int32(seq), MSG_PONG, buffer)
+	buf := buffer.Bytes()
+	n, err := conn.Write(buf)
+	if err != nil || n != len(buf) {
+		log.Info("sock write error", err)
+	}
+}
+
 func WriteInputing(conn io.Writer, seq int, inputing *MessageInputing) {
 	var length int32 = 16
 	buffer := new(bytes.Buffer)
@@ -415,6 +428,8 @@ func SendMessage(conn io.Writer, msg *Message) {
 		WriteRST(conn, msg.seq)
 	} else if msg.cmd == MSG_HEARTBEAT {
 		WriteHeartbeat(conn, msg.seq)
+	} else if msg.cmd == MSG_PONG {
+		WritePong(conn, msg.seq)
 	} else if msg.cmd == MSG_INPUTING {
 		WriteInputing(conn, msg.seq, msg.body.(*MessageInputing))
 	} else if msg.cmd == MSG_GROUP_NOTIFICATION {
