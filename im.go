@@ -9,27 +9,16 @@ import "github.com/garyburd/redigo/redis"
 import log "github.com/golang/glog"
 
 var route *Route
-var cluster *Cluster
-var storage *Storage
-var group_manager *GroupManager
-var group_server *GroupServer
-var state_center *StateCenter
 var redis_pool *redis.Pool
 var tunnel *Tunnel
 var config *Config
 
 func init() {
 	route = NewRoute()
-	state_center = NewStateCenter()
 }
 
 func handle_client(conn *net.TCPConn) {
 	client := NewClient(conn)
-	client.Run()
-}
-
-func handle_peer_client(conn *net.TCPConn) {
-	client := NewPeerClient(conn)
 	client.Run()
 }
 
@@ -53,10 +42,6 @@ func Listen(f func(*net.TCPConn), port int) {
 }
 func ListenClient() {
 	Listen(handle_client, config.port)
-}
-
-func ListenPeerClient() {
-	Listen(handle_peer_client, config.port+1)
 }
 
 func NewRedisPool(server, password string) *redis.Pool {
@@ -92,20 +77,10 @@ func main() {
 	log.Infof("port:%d tunnel port:%d storage root:%s redis address:%s\n",
 		config.port, config.tunnel_port, config.storage_root, config.redis_address)
 
-	cluster = NewCluster(config.peer_addrs)
-	cluster.Start()
-	storage = NewStorage(config.storage_root)
-	storage.Start()
-	group_server = NewGroupServer(config.port + 2)
-	group_server.Start()
-	group_manager = NewGroupManager()
-	group_manager.Start()
-
 	tunnel = NewTunnel()
 	tunnel.Start()
 
 	redis_pool = NewRedisPool(config.redis_address, "")
 
-	go ListenPeerClient()
 	ListenClient()
 }

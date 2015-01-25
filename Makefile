@@ -1,15 +1,9 @@
-all:im benchmark benchmark_connection
+all:voip
 
-im:im.go peer.go peer_client.go client.go cluster.go route.go protocol.go storage.go group_server.go group_manager.go group.go set.go state_center.go config.go tunnel.go
-	go build im.go peer.go peer_client.go client.go cluster.go route.go protocol.go storage.go group_server.go group_manager.go group.go set.go state_center.go config.go tunnel.go
-
-benchmark:benchmark.go protocol.go
-	go build benchmark.go protocol.go
-
-benchmark_connection:benchmark_connection.go protocol.go
-	go build benchmark_connection.go protocol.go
+voip:im.go client.go route.go protocol.go  set.go  config.go tunnel.go
+	go build -o voip im.go client.go route.go protocol.go  set.go  config.go tunnel.go
 
 install:all
-	cp im ./bin
+	cp voip ./bin
 clean:
-	rm -f im benchmark benchmark_connection
+	rm -f voip
