@@ -5,6 +5,7 @@ import time
 import requests
 import json
 import sys
+import os
 import select
 
 MSG_HEARTBEAT = 1
@@ -34,7 +35,7 @@ VOIP_COMMAND_RESET = 7
 VOIP_COMMAND_TALKING = 8
 
 HOST = "127.0.0.1"
-HOST = "106.186.122.158"
+#HOST = "106.186.122.158"
 class Authentication:
     def __init__(self):
         self.uid = 0
@@ -141,8 +142,8 @@ def send_connected(sock, seq, sender, receiver):
     send_control(sock, seq, sender, receiver, VOIP_COMMAND_CONNECTED)
     
 def simultaneous_dial():
-    caller = 86013800000009
-    called = 86013800000000
+    caller = 86013800000000
+    called = 86013800000009
 
     sock, seq = connect_server(caller, 20000)
     seq = seq + 1
@@ -179,10 +180,7 @@ def simultaneous_dial():
 
     while True:
         cmd, _, msg = recv_message(sock)
-        if cmd == MSG_VOIP_DATA:
-            print "recv voip data"
-            continue
-        elif cmd == MSG_VOIP_CONTROL:
+        if cmd == MSG_VOIP_CONTROL:
             print "recv voip control:", msg.cmd
             if msg.cmd == VOIP_COMMAND_HANG_UP:
                 print "peer hang up"
@@ -281,5 +279,12 @@ def query_yes_no(question, default="yes"):
                              "(or 'y' or 'n').\n")
 
 if __name__ == "__main__":
-    simultaneous_dial()
-    #listen()
+    if len(sys.argv) < 2:
+        print "usage:voip_client.py call/wait"
+        sys.exit(0)
+    if sys.argv[1] == "call":
+        simultaneous_dial()
+    elif sys.argv[1] == "wait":
+        listen()
+    else:
+        print "usage:voip_client.py call/wait"

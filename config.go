@@ -1,18 +1,14 @@
 package main
 
 import "strconv"
-import "strings"
 import "log"
 import "github.com/jimlawless/cfg"
-import "net"
+
 
 type Config struct {
 	port               int
 	tunnel_port        int
-	storage_root       string
-	mysqldb_datasource string
 	redis_address      string
-	peer_addrs         []*net.TCPAddr
 }
 
 func get_int(app_cfg map[string]string, key string) int {
@@ -53,22 +49,6 @@ func read_cfg(cfg_path string) *Config {
 
 	config.port = get_int(app_cfg, "port")
 	config.tunnel_port = get_int(app_cfg, "tunnel_port")
-	config.storage_root = get_string(app_cfg, "storage_root")
 	config.redis_address = get_string(app_cfg, "redis_address")
-	config.mysqldb_datasource = get_string(app_cfg, "mysqldb_source")
-
-	config.peer_addrs = make([]*net.TCPAddr, 0)
-	peers := get_opt_string(app_cfg, "peers")
-	if len(peers) > 0 {
-		arr := strings.Split(peers, ",")
-		for _, item := range arr {
-			t := strings.Split(item, ":")
-			host := t[0]
-			port, _ := strconv.Atoi(t[1])
-			ip := net.ParseIP(host)
-			addr := &net.TCPAddr{ip, port, ""}
-			config.peer_addrs = append(config.peer_addrs, addr)
-		}
-	}
 	return config
 }

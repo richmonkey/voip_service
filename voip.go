@@ -8,13 +8,14 @@ import "runtime"
 import "github.com/garyburd/redigo/redis"
 import log "github.com/golang/glog"
 
-var route *Route
+
+var app_route *AppRoute
 var redis_pool *redis.Pool
 var tunnel *Tunnel
 var config *Config
 
 func init() {
-	route = NewRoute()
+	app_route = NewAppRoute()
 }
 
 func handle_client(conn *net.TCPConn) {
@@ -74,8 +75,8 @@ func main() {
 	}
 
 	config = read_cfg(flag.Args()[0])
-	log.Infof("port:%d tunnel port:%d storage root:%s redis address:%s\n",
-		config.port, config.tunnel_port, config.storage_root, config.redis_address)
+	log.Infof("port:%d tunnel port:%d redis address:%s\n",
+		config.port, config.tunnel_port, config.redis_address)
 
 	tunnel = NewTunnel()
 	tunnel.Start()

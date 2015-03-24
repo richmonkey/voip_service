@@ -5,56 +5,63 @@ import log "github.com/golang/glog"
 
 
 type Route struct {
+	appid  int64
 	mutex   sync.Mutex
-	clients map[int64]*Client
+	clients map[int64]ClientSet
 }
 
-func NewRoute() *Route {
+func NewRoute(appid int64) *Route {
 	route := new(Route)
-	route.clients = make(map[int64]*Client)
+	route.appid = appid
+	route.clients = make(map[int64]ClientSet)
 	return route
 }
 
 func (route *Route) AddClient(client *Client) {
 	route.mutex.Lock()
 	defer route.mutex.Unlock()
-	if _, ok := route.clients[client.uid]; ok {
-		log.Info("client exists")
+	set, ok := route.clients[client.uid]; 
+	if !ok {
+		set = NewClientSet()
+		route.clients[client.uid] = set
 	}
-	route.clients[client.uid] = client
+	set.Add(client)
 }
 
-func (route *Route) RemoveClient(client *Client) {
+func (route *Route) RemoveClient(client *Client) bool {
 	route.mutex.Lock()
 	defer route.mutex.Unlock()
-	if _, ok := route.clients[client.uid]; ok {
-		if route.clients[client.uid] == client {
+	if set, ok := route.clients[client.uid]; ok {
+		set.Remove(client)
+		if set.Count() == 0 {
 			delete(route.clients, client.uid)
-			return
 		}
+		return true
 	}
 	log.Info("client non exists")
+	return false
 }
 
-func (route *Route) FindClient(uid int64) *Client {
+func (route *Route) FindClientSet(uid int64) ClientSet {
 	route.mutex.Lock()
 	defer route.mutex.Unlock()
 
-	c, ok := route.clients[uid]
+	set, ok := route.clients[uid]
 	if ok {
-		return c
+		return set.Clone()
 	} else {
 		return nil
 	}
 }
 
 func (route *Route) GetClientUids() map[int64]int32 {
-	route.mutex.Lock()
-	defer route.mutex.Unlock()
-	uids := make(map[int64]int32)
-	for uid, c := range route.clients {
-		uids[uid] = int32(c.tm.Unix())
-	}
-	return uids
+	return nil
+	// route.mutex.Lock()
+	// defer route.mutex.Unlock()
+	// uids := make(map[int64]int32)
+	// for uid, c := range route.clients {
+	// 	uids[uid] = int32(c.tm.Unix())
+	// }
+	// return uids
 }
 
