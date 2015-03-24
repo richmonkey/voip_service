@@ -49,6 +49,8 @@ func (client *Client) Read() {
 		log.Info("msg:", msg.cmd)
 		if msg.cmd == MSG_AUTH {
 			client.HandleAuth(msg.body.(*Authentication))
+		} else if msg.cmd == MSG_AUTH_TOKEN {
+			client.HandleAuthToken(msg.body.(*AuthenticationToken))
 		} else if msg.cmd == MSG_HEARTBEAT {
 
 		} else if msg.cmd == MSG_PING {
