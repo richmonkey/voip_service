@@ -120,7 +120,7 @@ func (client *Client) HandleAuthToken(login *AuthenticationToken) {
 
 func (client *Client) HandleAuth(login *Authentication) {
 	client.tm = time.Now()
-	client.appid = 0
+	client.appid = 1006
 	client.uid = login.uid
 	log.Info("auth:", login.uid)
 	msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{0}}
