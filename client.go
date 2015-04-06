@@ -108,7 +108,7 @@ func (client *Client) HandleAuthToken(login *AuthenticationToken) {
 	client.tm = time.Now()
 	client.uid = uid
 	client.appid = appid
-	log.Info("auth:", uid)
+	log.Infof("auth appid:%d uid:%d\n", appid, uid)
 
 	msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{0}}
 	client.wt <- msg
@@ -169,7 +169,7 @@ func (client *Client) GetDialCount(ctl *VOIPControl) int {
 
 
 func (client *Client) IsROMApp(appid int64) bool {
-	return appid == 17
+	return false
 }
 
 func (client *Client) PublishMessage(ctl *VOIPControl) {
@@ -184,9 +184,9 @@ func (client *Client) PublishMessage(ctl *VOIPControl) {
 	defer conn.Close()
 
 	v := make(map[string]interface{})
-	v["content"] = "您的朋友请求与您通话"
 	v["sender"] = ctl.sender
 	v["receiver"] = ctl.receiver
+	v["appid"] = client.appid
 	b, _ := json.Marshal(v)
 
 	appid := client.appid

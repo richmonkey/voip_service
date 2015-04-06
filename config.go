@@ -8,6 +8,7 @@ import "github.com/jimlawless/cfg"
 type Config struct {
 	port               int
 	tunnel_port        int
+	tunnel_port_v2     int
 	redis_address      string
 }
 
@@ -49,6 +50,7 @@ func read_cfg(cfg_path string) *Config {
 
 	config.port = get_int(app_cfg, "port")
 	config.tunnel_port = get_int(app_cfg, "tunnel_port")
+	config.tunnel_port_v2 = get_int(app_cfg, "tunnel_port_v2")
 	config.redis_address = get_string(app_cfg, "redis_address")
 	return config
 }

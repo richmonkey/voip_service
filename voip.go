@@ -75,8 +75,8 @@ func main() {
 	}
 
 	config = read_cfg(flag.Args()[0])
-	log.Infof("port:%d tunnel port:%d redis address:%s\n",
-		config.port, config.tunnel_port, config.redis_address)
+	log.Infof("port:%d tunnel port:%d port v2:%d redis address:%s\n",
+		config.port, config.tunnel_port, config.tunnel_port_v2, config.redis_address)
 
 	tunnel = NewTunnel()
 	tunnel.Start()
