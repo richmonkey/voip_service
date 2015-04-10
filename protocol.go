@@ -258,21 +258,24 @@ func (auth *AuthenticationToken) FromData(buff []byte) bool {
 
 type AuthenticationStatus struct {
 	status int32
+	ip     int32 //主机公网ip
 }
 
 func (auth *AuthenticationStatus) ToData() []byte {
 	buffer := new(bytes.Buffer)
 	binary.Write(buffer, binary.BigEndian, auth.status)
+	binary.Write(buffer, binary.BigEndian, auth.ip)
 	buf := buffer.Bytes()
 	return buf
 }
 
 func (auth *AuthenticationStatus) FromData(buff []byte) bool {
-	if len(buff) < 4 {
+	if len(buff) < 8 {
 		return false
 	}
 	buffer := bytes.NewBuffer(buff)
 	binary.Read(buffer, binary.BigEndian, &auth.status)
+	binary.Read(buffer, binary.BigEndian, &auth.ip)
 	return true
 }
 

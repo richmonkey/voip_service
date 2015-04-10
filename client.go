@@ -18,12 +18,18 @@ type Client struct {
 	device_id string
 	platform_id int8
 	conn   *net.TCPConn
+	public_ip int32
 }
 
 func NewClient(conn *net.TCPConn) *Client {
 	client := new(Client)
 	client.conn = conn
 	client.wt = make(chan *Message, 10)
+	addr := conn.LocalAddr()
+	if taddr, ok := addr.(*net.TCPAddr); ok {
+		ip4 := taddr.IP.To4()
+		client.public_ip = int32(ip4[0]) << 24 | int32(ip4[1]) << 16 | int32(ip4[2]) << 8 | int32(ip4[3])
+	}
 	return client
 }
 
@@ -94,13 +100,13 @@ func (client *Client) HandleAuthToken(login *AuthenticationToken) {
 	appid, uid, err := client.AuthToken(login.token)
 	if err != nil {
 		log.Info("auth token err:", err)
-		msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{1}}
+		msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{1, 0}}
 		client.wt <- msg
 		return
 	}
 	if uid == 0 || appid == 0 {
 		log.Info("auth token appid==0, uid==0")
-		msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{1}}
+		msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{1, 0}}
 		client.wt <- msg
 		return
 	}
@@ -110,7 +116,7 @@ func (client *Client) HandleAuthToken(login *AuthenticationToken) {
 	client.appid = appid
 	log.Infof("auth appid:%d uid:%d\n", appid, uid)
 
-	msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{0}}
+	msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{0, client.public_ip}}
 	client.wt <- msg
 
 	client.SendLoginPoint()
@@ -123,7 +129,7 @@ func (client *Client) HandleAuth(login *Authentication) {
 	client.appid = 1006
 	client.uid = login.uid
 	log.Info("auth:", login.uid)
-	msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{0}}
+	msg := &Message{cmd: MSG_AUTH_STATUS, body: &AuthenticationStatus{0, 0}}
 	client.wt <- msg
 
 	client.AddClient()
