@@ -88,7 +88,7 @@ def recv_message(sock):
         return 0, 0, None
 
     if cmd == MSG_AUTH_STATUS:
-        status, = struct.unpack("!i", content)
+        status, ip = struct.unpack("!ii", content)
         return cmd, seq, status
     elif cmd == MSG_VOIP_CONTROL:
         ctl = VOIPControl()
