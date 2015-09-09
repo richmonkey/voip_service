@@ -170,6 +170,8 @@ func (client *Client) HandlePing() {
 
 
 const VOIP_COMMAND_DIAL = 1
+const VOIP_COMMAND_DIAL_VIDEO = 9
+
 
 func (client *Client) GetDialCount(ctl *VOIPControl) int {
 	if len(ctl.content) < 4 {
@@ -179,7 +181,7 @@ func (client *Client) GetDialCount(ctl *VOIPControl) int {
 	var ctl_cmd int32
 	buffer := bytes.NewBuffer(ctl.content)
 	binary.Read(buffer, binary.BigEndian, &ctl_cmd)
-	if ctl_cmd != VOIP_COMMAND_DIAL {
+	if ctl_cmd != VOIP_COMMAND_DIAL && ctl_cmd != VOIP_COMMAND_DIAL_VIDEO {
 		return 0
 	}
 
@@ -204,7 +206,7 @@ func (client *Client) PublishMessage(ctl *VOIPControl) {
 		return
 	}
 
-	log.Info("publish invite notification")
+	log.Infof("publish invite notification sender:%d receiver:%d", ctl.sender, ctl.receiver)
 	conn := redis_pool.Get()
 	defer conn.Close()
 

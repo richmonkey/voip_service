@@ -40,6 +40,7 @@ type TunnelClient struct {
 	addr      *net.UDPAddr
 	timestamp int64
 	has_header  bool
+	token     string
 }
 
 type TunnelClientSet map[int64]*TunnelClient
@@ -95,10 +96,12 @@ func (tunnel *Tunnel) HandleVOIPData(buff []byte, addr *net.UDPAddr, conn *net.U
 	if client == nil || client.appid == 0 {
 		return
 	}
+
 	client.timestamp = now
 	//转发消息
 	other := tunnel.FindAppClient(client.appid, receiver)
 	if other == nil {
+		log.Infof("can't dispatch voip data sender:%d receiver:%d", client.uid, receiver)
 		return
 	}
 
@@ -124,21 +127,26 @@ func (tunnel *Tunnel) HandleAuth(buff []byte, addr *net.UDPAddr, conn *net.UDPCo
 	client := tunnel.FindClient(addr)
 	if client == nil {
 		//首次收到认证消息
-		client = &TunnelClient{appid:0, uid:0, addr:addr, timestamp:now, has_header:true}
-		tunnel.AddClient(addr, client)
+		client = &TunnelClient{appid:0, uid:0, addr:addr, timestamp:now, has_header:true, token:token}
 		tunnel.AuthClient(client, token)
 		return
-	} else if client.appid == 0 {
-		//认证中
-		return
-	} else {
+	} else if client.token == token {
 		//认证成功
 		t := make([]byte, 2)
 		t[0] = VOIP_AUTH_STATUS
 		t[1] = 0
 		conn.WriteTo(t, addr)
+		client.timestamp = now
 		log.Infof("tunnel auth appid:%d uid:%d", client.appid, client.uid)
-	}	
+	} else {
+		//新的token
+		tunnel.RemoveTunnelClient(client)
+		client.token = token
+		client.appid = 0
+		client.uid = 0
+		client.timestamp = now
+		tunnel.AuthClient(client, token)
+	}
 }
 
 func (tunnel *Tunnel) Addr2Int64(addr *net.UDPAddr) int64 {
@@ -149,12 +157,44 @@ func (tunnel *Tunnel) Addr2Int64(addr *net.UDPAddr) int64 {
 	return (int64(ip[0]) << 24) | (int64(ip[1]) << 16) | (int64(ip[2]) << 8) | int64(ip[3]) | (int64(addr.Port) << 32)
 }
 
-func (tunnel *Tunnel) AddClient(addr *net.UDPAddr, c *TunnelClient) {
+func (tunnel *Tunnel) AddTunnelClient(client *TunnelClient) {
 	tunnel.mutex.Lock()
 	defer tunnel.mutex.Unlock()
 
-	iaddr := tunnel.Addr2Int64(addr)
-	tunnel.clients[iaddr] = c
+	appid := client.appid
+	uid := client.uid
+
+	if client_set, ok := tunnel.app_clients[appid]; ok {
+		if old_client, ok := client_set[uid]; ok {
+			//此用户已经登录,删除前一个登陆点
+			iaddr := tunnel.Addr2Int64(old_client.addr)
+			delete(tunnel.clients, iaddr)
+		}		
+	}	
+	iaddr := tunnel.Addr2Int64(client.addr)
+	tunnel.clients[iaddr] = client
+	
+	if client_set, ok := tunnel.app_clients[appid]; ok {
+		client_set[uid] = client
+	} else {
+		client_set = make(map[int64]*TunnelClient)
+		client_set[uid] = client
+		tunnel.app_clients[appid] = client_set
+	}
+}
+
+func (tunnel *Tunnel) RemoveTunnelClient(client *TunnelClient) {
+	tunnel.mutex.Lock()
+	defer tunnel.mutex.Unlock()
+
+	iaddr := tunnel.Addr2Int64(client.addr)
+	delete(tunnel.clients, iaddr)
+
+	appid := client.appid
+	uid := client.uid
+	if client_set, ok := tunnel.app_clients[appid]; ok {
+		delete(client_set, uid)
+	}
 }
 
 func (tunnel *Tunnel) FindClient(addr *net.UDPAddr) *TunnelClient {
@@ -163,19 +203,6 @@ func (tunnel *Tunnel) FindClient(addr *net.UDPAddr) *TunnelClient {
 	defer tunnel.mutex.Unlock()
 
 	return tunnel.clients[iaddr]
-}
-
-func (tunnel *Tunnel) AddAppClient(c *TunnelClient) {
-	tunnel.mutex.Lock()
-	defer tunnel.mutex.Unlock()
-
-	if client_set, ok := tunnel.app_clients[c.appid]; ok {
-		client_set[c.uid] = c
-		return
-	}
-	client_set := make(map[int64]*TunnelClient)
-	client_set[c.uid] = c
-	tunnel.app_clients[c.appid] = client_set
 }
 
 func (tunnel *Tunnel) FindAppClient(appid int64, uid int64) *TunnelClient {
@@ -190,6 +217,15 @@ func (tunnel *Tunnel) FindAppClient(appid int64, uid int64) *TunnelClient {
 	return nil
 }
 
+func (tunnel *Tunnel) RemoveAppClient(appid int64, uid int64) {
+	tunnel.mutex.Lock()
+	defer tunnel.mutex.Unlock()
+	
+	if client_set, ok := tunnel.app_clients[appid]; ok {
+		delete(client_set, uid)
+	}
+}
+
 func (tunnel *Tunnel) AuthClient(client *TunnelClient, token string) {
 	go func() {
 		appid, uid, _, err := LoadUserAccessToken(token)
@@ -200,11 +236,10 @@ func (tunnel *Tunnel) AuthClient(client *TunnelClient, token string) {
 
 		client.appid = appid
 		client.uid = uid
-		tunnel.AddAppClient(client)
+		log.Infof("auth client:%d", uid)
+		tunnel.AddTunnelClient(client)
 	}()
 }
-
-
 
 
 func (tunnel *Tunnel) GC() {
@@ -222,6 +257,7 @@ func (tunnel *Tunnel) GC() {
 			if s, ok := tunnel.app_clients[c.appid]; ok {
 				delete(s, c.uid)
 			}
+			log.Infof("client gc:%d", c.uid)
 		}
 	}
 	tunnel.gc_ts = now
@@ -293,8 +329,7 @@ func (tunnel *Tunnel) Run() {
 		client := tunnel.FindClient(raddr)
 		if client == nil {
 			client = &TunnelClient{appid:appid, uid:sender, addr:raddr, timestamp:now, has_header:false}
-			tunnel.AddClient(raddr, client)
-			tunnel.AddAppClient(client)
+			tunnel.AddTunnelClient(client)
 		} else {
 			client.timestamp = now
 		}
