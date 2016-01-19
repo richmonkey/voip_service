@@ -97,10 +97,16 @@ func main() {
 	log.Infof("port:%d tunnel port:%d port v2:%d redis address:%s\n",
 		config.port, config.tunnel_port, config.tunnel_port_v2, config.redis_address)
 
-	tunnel = NewTunnel()
-	tunnel.Start()
 
 	redis_pool = NewRedisPool(config.redis_address, "")
 
-	ListenClient()
+	tunnel = NewTunnel()
+
+//disable tcp
+	go tunnel.Run()
+	tunnel.RunV2()
+
+//enable tcp
+	//tunnel.Start()
+	//ListenClient()
 }
