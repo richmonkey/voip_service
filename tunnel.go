@@ -24,6 +24,7 @@ import "fmt"
 import "net"
 import "bytes"
 import "sync"
+import "errors"
 import "encoding/binary"
 import log "github.com/golang/glog"
 
@@ -66,6 +67,10 @@ func (tunnel *Tunnel) Start() {
 }
 
 func (tunnel *Tunnel) ReadVOIPData(buff []byte) (int64, int64, []byte, error) {
+	if len(buff) <= 16 {
+		log.Error("invalid voip data len:", len(buff))
+		return 0, 0, nil, errors.New("invalid voip data len")
+	}
 	buffer := bytes.NewBuffer(buff)
 	var sender int64
 	var receiver int64
@@ -85,7 +90,6 @@ func (tunnel *Tunnel) ReadVOIPAuth(buff []byte) (string, error) {
 
 func (tunnel *Tunnel) HandleVOIPData(buff []byte, addr *net.UDPAddr, conn *net.UDPConn) {
 	now := time.Now().Unix()
-
 
 	_, receiver, _, err := tunnel.ReadVOIPData(buff)
 	if err != nil {
